@@ -3,25 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-typedef struct tPoint Pt;
-typedef struct tGeom Geom;
-
-enum {
-	GEOM_NONE,
-	GEOM_POINT,
-	GEOM_LAST
-};
-
-struct tPoint {
-	float xf, yf, zf;
-};
-
-struct tGeom {
-	int tag;
-	union {
-		Pt pt;
-	};
-};
+#include "quadtree.h"
 
 Geom *P_New(float xf, float yf, float zf)
 {
@@ -37,39 +19,6 @@ Geom *P_New(float xf, float yf, float zf)
 
 	return geom;
 }
-
-typedef struct tLeaf Leaf;
-typedef struct tNode Node;
-typedef struct tQuad Quad;
-
-enum {
-	QUAD_NONE,
-	QUAD_LEAF,
-	QUAD_SMALL,
-	QUAD_NODE,
-	QUAD_LAST
-};
-
-#define LEAFMINSIZE 10
-
-struct tLeaf {
-	int size, full;
-	Geom **geom;
-};
-
-struct tNode {
-	int centrex, centrey;
-	Quad *nw, *ne, *sw, *se;
-};
-
-struct tQuad {
-	int tag;
-	int left, top, width, height;
-	union {
-		Leaf leaf;
-		Node node;
-	};
-};
 
 void Q_Init(Quad *quad, int tag, int left, int top, int width, int height)
 {
@@ -175,14 +124,6 @@ int almost(float aa, float bb)
 
 int News(int centrex, int centrey, float xf, float yf)
 {
-	// printf(">>>News(%d, %d, %f, %f)\n", centrex, centrey, xf, yf);
-
-	// if (almost(centrex, xf) || almost(centrey, yf)) {
-	// 	// TODO: determine how to handle ambiguous offsets
-	// 	fprintf(stderr, "BUG: News: ambiguous\n");
-	// 	exit(1);
-	// }
-
 	if (xf < centrex) {
 		if (yf < centrey) {
 			return NEWS_NW;
@@ -259,6 +200,7 @@ void QL_SplitLarge(Quad *quad, int centrex, int centrey)
 	quad->tag = QUAD_NODE;
 }
 
+// Find a centre such that that points are evenly distributed
 void QL_Centre(Quad *quad, int *centrex, int *centrey)
 {
 	assert(quad);
@@ -295,10 +237,6 @@ void QL_Split(Quad *quad)
 
 	int centrex, centrey;
 	QL_Centre(quad, &centrex, &centrey);
-
-	// TODO:
-	// 1.  Determine if any of the new leaves would be too small,
-	//     and replace the current leaf with a SMALL if any are.
 
 	if (
 		centrex - quad->left < QUADMINEXTENT ||
@@ -349,8 +287,6 @@ int QL_Find(Quad *quad, float xf, float yf, Geom **found)
 
 void Q_Add(Quad *quad, Geom *geom)
 {
-	// printf(">>>Q_Add\n");
-
 	assert(quad);
 	assert(geom);
 	assert(geom->tag == GEOM_POINT);
@@ -402,7 +338,6 @@ void Q_Add(Quad *quad, Geom *geom)
 	}
 }
 
-// int Q_Find(Quad *quad, float xf, float yf, Quad **found)
 int Q_Find(Quad *quad, float xf, float yf, Geom **found)
 {
 	assert(quad);
@@ -431,20 +366,6 @@ int Q_Find(Quad *quad, float xf, float yf, Geom **found)
 		return Q_Find(quad, xf, yf, found);
 	case QUAD_LEAF:
 	case QUAD_SMALL:
-		// Leaf *leaf = &quad->leaf;
-		// Geom *geom;
-		// int ii;
-		// for (ii = 0; ii < leaf->full; ii++) {
-		// 	geom = leaf->geom[ii];
-		// 	assert(geom);
-		// 	assert(geom->tag == GEOM_POINT);
-		// 	if (almost(geom->pt.xf, xf) && almost(geom->pt.yf, yf)) {
-		// 		*found = quad;
-		// 		break;
-		// 	}
-		// }
-		// return ii < leaf->full;
-
 		return QL_Find(quad, xf, yf, found);
 	default:
 		fprintf(stderr, "BUG: Q_Find: unknown tag: %d\n", quad->tag);
